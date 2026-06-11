@@ -28,7 +28,7 @@ class _MainShellState extends State<MainShell> {
   @override
   void initState() {
     super.initState();
-    context.read<FridgeProvider>().init();
+    //context.read<FridgeProvider>().init();
   }
 
   @override
