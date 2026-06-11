@@ -6,21 +6,22 @@ import 'providers/fridge_provider.dart';
 import 'screens/splash_screen.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/main_shell.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+  
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SETUP: Replace these with your actual Supabase credentials.
 // 1. Go to https://supabase.com → your project → Settings → API
 // 2. Copy "Project URL" and "anon public" key below.
 // ─────────────────────────────────────────────────────────────────────────────
-const String supabaseUrl = 'https://YOUR_PROJECT.supabase.co';
-const String supabaseAnonKey = 'YOUR_ANON_KEY';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await dotenv.load(fileName: ".env");
 
   await Supabase.initialize(
-    url: supabaseUrl,
-    anonKey: supabaseAnonKey,
+    url: dotenv.env['SUPABASE_URL']!,
+    anonKey: dotenv.env['SUPABASE_ANON_KEY']!,
   );
 
   runApp(
