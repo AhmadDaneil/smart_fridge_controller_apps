@@ -1,3 +1,5 @@
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 class FridgeItem {
   final String id;
   final String name;
@@ -31,6 +33,7 @@ class FridgeItem {
 
   Map<String, dynamic> toJson() {
     return {
+      'user_id': Supabase.instance.client.auth.currentUser!.id,
       'name': name,
       'weight_grams': weightGrams,
       'expiry_date': expiryDate.toIso8601String().split('T').first,

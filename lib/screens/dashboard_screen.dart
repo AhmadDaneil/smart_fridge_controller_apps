@@ -15,7 +15,10 @@ class DashboardScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: AppTheme.bgLight,
-      body: CustomScrollView(
+      body: RefreshIndicator(
+        color: AppTheme.primary,        // ADD THIS
+        onRefresh: () => context.read<FridgeProvider>().refresh(),
+        child: CustomScrollView(
         slivers: [
           // App bar
           SliverAppBar(
@@ -170,6 +173,7 @@ class DashboardScreen extends StatelessWidget {
             ),
           ),
         ],
+      ),
       ),
     );
   }

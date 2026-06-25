@@ -134,7 +134,10 @@ class _InventoryScreenState extends State<InventoryScreen> {
           Expanded(
             child: items.isEmpty
                 ? _buildEmpty()
-                : ListView.separated(
+                : RefreshIndicator(
+                  color: AppTheme.primary,
+                  onRefresh: () => context.read<FridgeProvider>().refresh(),
+                  child: ListView.separated(
                     padding: const EdgeInsets.all(16),
                     itemCount: items.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 10),
@@ -143,6 +146,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                       onDelete: () => provider.deleteItem(items[i].id),
                     ),
                   ),
+                ),
           ),
         ],
       ),

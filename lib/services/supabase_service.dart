@@ -47,18 +47,22 @@ class SupabaseService {
 
   /// Get all fridge items for current user
   Future<List<FridgeItem>> getFridgeItems() async {
+    final userId = _client.auth.currentUser!.id;
     final response = await _client
         .from('fridge_items')
         .select()
+        .eq('user_id', userId)
         .order('expiry_date', ascending: true);
     return (response as List).map((e) => FridgeItem.fromJson(e)).toList();
   }
 
   /// Stream real-time inventory updates
   Stream<List<FridgeItem>> fridgeItemsStream() {
+    final userId = _client.auth.currentUser!.id;
     return _client
         .from('fridge_items')
         .stream(primaryKey: ['id'])
+        .eq('user_id', userId)
         .order('expiry_date', ascending: true)
         .map((rows) => rows.map((e) => FridgeItem.fromJson(e)).toList());
   }
@@ -78,7 +82,9 @@ class SupabaseService {
 
   /// Delete fridge item
   Future<void> deleteFridgeItem(String id) async {
-    await _client.from('fridge_items').delete().eq('id', id);
+    await _client.from('fridge_items')
+      .delete()
+      .eq('id', int.parse(id));
   }
 
   // ─── AUTH ────────────────────────────────────────────────────────────────────

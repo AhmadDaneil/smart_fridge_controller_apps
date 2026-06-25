@@ -73,6 +73,8 @@ class _AddItemScreenState extends State<AddItemScreen> {
         await provider.addItem(item);
       }
 
+      await provider.refresh();
+
       if (mounted) Navigator.pop(context);
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(

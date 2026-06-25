@@ -38,16 +38,24 @@ class FridgeProvider extends ChangeNotifier {
   }
 
   void _listenItems() {
-    _itemsSub = _service.fridgeItemsStream().listen((items) {
-      _items = items;
-      _loading = false;
-      notifyListeners();
-    }, onError: (e) {
-      _error = e.toString();
-      _loading = false;
-      notifyListeners();
-    });
-  }
+  // Fetch immediately on init
+  _service.getFridgeItems().then((items) {
+    _items = items;
+    _loading = false;
+    notifyListeners();
+  });
+
+  // Then keep listening for realtime changes
+  _itemsSub = _service.fridgeItemsStream().listen((items) {
+    _items = items;
+    _loading = false;
+    notifyListeners();
+  }, onError: (e) {
+    _error = e.toString();
+    _loading = false;
+    notifyListeners();
+  });
+}
 
   void _listenSensor() {
     _sensorSub = _service.sensorDataStream().listen((data) {
@@ -71,9 +79,13 @@ class FridgeProvider extends ChangeNotifier {
 
   Future<void> deleteItem(String id) async {
     await _service.deleteFridgeItem(id);
+    await refresh();
   }
 
   Future<void> refresh() async {
+    final items = await _service.getFridgeItems();
+    _items = items;
+    notifyListeners();
     await _loadHistory();
   }
 
