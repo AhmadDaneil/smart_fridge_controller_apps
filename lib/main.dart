@@ -7,7 +7,8 @@ import 'screens/splash_screen.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/main_shell.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-  
+import 'services/notification_service.dart';
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SETUP: Replace these with your actual Supabase credentials.
@@ -26,6 +27,9 @@ Future<void> main() async {
     url: dotenv.env['SUPABASE_URL']!,
     anonKey: dotenv.env['SUPABASE_ANON_KEY']!,
   );
+
+  await NotificationService().init();
+  await NotificationService().requestPermissions();
 
   runApp(
     MultiProvider(

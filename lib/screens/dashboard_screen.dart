@@ -4,6 +4,8 @@ import 'package:intl/intl.dart';
 import '../providers/fridge_provider.dart';
 import '../theme.dart';
 import '../models/sensor_data.dart';
+import '../services/supabase_service.dart';
+import 'auth/login_screen.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
@@ -26,6 +28,13 @@ class DashboardScreen extends StatelessWidget {
             floating: true,
             pinned: false,
             backgroundColor: AppTheme.primary,
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.logout_rounded, color: Colors.white),
+                tooltip: 'Log out',
+                onPressed: () => _confirmLogout(context),
+              ),
+            ],
             flexibleSpace: FlexibleSpaceBar(
               titlePadding: const EdgeInsets.symmetric(
                 horizontal: 20,
@@ -85,7 +94,7 @@ class DashboardScreen extends StatelessWidget {
                               : 'Out of range',
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 10),
                       Expanded(
                         child: _SensorTile(
                           icon: Icons.water_drop_outlined,
@@ -97,6 +106,24 @@ class DashboardScreen extends StatelessWidget {
                           subtitle: sensor.isHumidityNormal
                               ? 'Normal'
                               : 'Check fridge',
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _SensorTile(
+                          icon: sensor.isDoorOpen
+                              ? Icons.door_front_door_rounded
+                              : Icons.door_front_door_outlined,
+                          label: 'Door',
+                          value: sensor.isDoorOpen ? 'Open' : 'Closed',
+                          status: sensor.isDoorOpen
+                              ? (provider.isDoorLeftOpen
+                                  ? _StatusLevel.bad
+                                  : _StatusLevel.warn)
+                              : _StatusLevel.good,
+                          subtitle: provider.isDoorLeftOpen
+                              ? 'Left open!'
+                              : (sensor.isDoorOpen ? 'Just opened' : 'Secure'),
                         ),
                       ),
                     ],
@@ -164,7 +191,6 @@ class DashboardScreen extends StatelessWidget {
                               : item.isExpiringSoon
                               ? AppTheme.warning
                               : AppTheme.safe,
-                          weight: item.weightGrams,
                         ),
                       ),
 
@@ -183,6 +209,37 @@ class DashboardScreen extends StatelessWidget {
     if (h < 12) return 'morning';
     if (h < 17) return 'afternoon';
     return 'evening';
+  }
+
+  Future<void> _confirmLogout(BuildContext context) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Log out?'),
+        content: const Text('You will need to sign in again to continue.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Log out', style: TextStyle(color: AppTheme.danger)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      await SupabaseService().signOut();
+      if (context.mounted) {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => const LoginScreen()),
+          (route) => false,
+        );
+      }
+    }
   }
 
   Widget _shimmerPlaceholder() {
@@ -342,14 +399,12 @@ class _StatCard extends StatelessWidget {
 class _ItemPreviewTile extends StatelessWidget {
   final String name, category, expiryLabel;
   final Color statusColor;
-  final double weight;
 
   const _ItemPreviewTile({
     required this.name,
     required this.category,
     required this.expiryLabel,
     required this.statusColor,
-    required this.weight,
   });
 
   @override
@@ -387,7 +442,7 @@ class _ItemPreviewTile extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '$category · ${weight.toStringAsFixed(0)}g',
+                  category,
                   style: const TextStyle(
                     fontSize: 12,
                     color: AppTheme.textSecondary,

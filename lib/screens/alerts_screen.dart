@@ -53,14 +53,15 @@ class AlertsScreen extends StatelessWidget {
       ));
     }
 
-    // Low weight items
-    for (final item in provider.items.where((i) => i.isLowWeight)) {
+    // Door left open
+    if (provider.isDoorLeftOpen) {
+      final mins = provider.doorOpenDuration!.inMinutes;
       alerts.add(_Alert(
-        icon: Icons.scale_outlined,
-        title: '${item.name} Running Low',
-        message: '${item.name} is below 100g (${item.weightGrams.toStringAsFixed(0)}g). '
-            'Consider restocking.',
-        severity: AlertSeverity.info,
+        icon: Icons.door_front_door_outlined,
+        title: 'Fridge Door Left Open',
+        message: 'The door has been open for $mins minute(s). '
+            'Close it to avoid energy loss and spoilage.',
+        severity: AlertSeverity.danger,
         time: DateTime.now(),
       ));
     }

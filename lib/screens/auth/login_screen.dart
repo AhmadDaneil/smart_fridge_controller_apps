@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../theme.dart';
 import '../../services/supabase_service.dart';
 import '../main_shell.dart';
@@ -22,17 +23,52 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() { _loading = true; _error = null; });
     try {
       final svc = SupabaseService();
+
       if (_isSignUp) {
-        await svc.signUp(_emailCtrl.text.trim(), _passwordCtrl.text);
+        final res = await svc.signUp(_emailCtrl.text.trim(), _passwordCtrl.text);
+
+        // Supabase does NOT throw an error for an already-registered email
+        // (to avoid leaking which emails exist). Instead it returns a user
+        // with an empty `identities` list. We have to check for that manually.
+        final alreadyRegistered =
+            res.user != null && (res.user!.identities?.isEmpty ?? false);
+
+        if (alreadyRegistered) {
+          setState(() => _error =
+              'This email is already registered. Please sign in instead.');
+          return;
+        }
+
+        // If email confirmation is enabled in Supabase, signUp succeeds but
+        // returns no session until the user confirms via email link.
+        if (res.session == null) {
+          setState(() {
+            _error = 'Account created! Please check your email to confirm '
+                'your account, then sign in.';
+            _isSignUp = false; // flip to sign-in view for convenience
+          });
+          return;
+        }
       } else {
         await svc.signIn(_emailCtrl.text.trim(), _passwordCtrl.text);
       }
+
+      // Only navigate if we actually have a live session.
+      if (svc.currentUser == null) {
+        setState(() => _error = 'Sign in failed. Please try again.');
+        return;
+      }
+
       if (mounted) {
         Navigator.pushReplacement(
           context, MaterialPageRoute(builder: (_) => const MainShell()));
       }
+    } on AuthException catch (e) {
+      // Supabase-specific errors (invalid credentials, weak password, etc.)
+      // come through as clean messages instead of a raw exception dump.
+      setState(() => _error = e.message);
     } catch (e) {
-      setState(() => _error = e.toString());
+      setState(() => _error = 'Something went wrong. Please try again.');
     } finally {
       if (mounted) setState(() => _loading = false);
     }

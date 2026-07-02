@@ -308,7 +308,7 @@ class _ItemCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      '${item.category} · ${item.weightGrams.toStringAsFixed(0)}g',
+                      '${item.category}',
                       style: const TextStyle(
                         fontSize: 12,
                         color: AppTheme.textSecondary,
@@ -342,26 +342,6 @@ class _ItemCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  if (item.isLowWeight)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppTheme.warning.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: const Text(
-                        'Low qty',
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: AppTheme.warning,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
                 ],
               ),
             ],

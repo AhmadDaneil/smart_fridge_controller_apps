@@ -2,14 +2,14 @@ class SensorData {
   final String id;
   final double temperature;
   final double humidity;
-  final double totalWeightGrams;
+  final bool isDoorOpen;
   final DateTime createdAt;
 
   SensorData({
     required this.id,
     required this.temperature,
     required this.humidity,
-    required this.totalWeightGrams,
+    required this.isDoorOpen,
     required this.createdAt,
   });
 
@@ -18,7 +18,9 @@ class SensorData {
       id: json['id'].toString(),
       temperature: (json['temperature'] as num).toDouble(),
       humidity: (json['humidity'] as num).toDouble(),
-      totalWeightGrams: (json['total_weight_grams'] as num?)?.toDouble() ?? 0.0,
+      // Reed switch reading from the ESP32. Defaults to false (closed) if
+      // the column is missing so older rows don't crash the app.
+      isDoorOpen: json['door_open'] as bool? ?? false,
       createdAt: DateTime.parse(json['created_at'] as String),
     );
   }
@@ -28,7 +30,7 @@ class SensorData {
       id: '',
       temperature: 0,
       humidity: 0,
-      totalWeightGrams: 0,
+      isDoorOpen: false,
       createdAt: DateTime.now(),
     );
   }

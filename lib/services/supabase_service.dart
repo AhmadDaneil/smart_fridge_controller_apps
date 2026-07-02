@@ -47,7 +47,12 @@ class SupabaseService {
 
   /// Get all fridge items for current user
   Future<List<FridgeItem>> getFridgeItems() async {
-    final userId = _client.auth.currentUser!.id;
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) {
+      // No active session — return empty instead of crashing the app.
+      // (Screens should also guard on AuthGate, but this is a safety net.)
+      return [];
+    }
     final response = await _client
         .from('fridge_items')
         .select()
@@ -58,7 +63,8 @@ class SupabaseService {
 
   /// Stream real-time inventory updates
   Stream<List<FridgeItem>> fridgeItemsStream() {
-    final userId = _client.auth.currentUser!.id;
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) return const Stream.empty();
     return _client
         .from('fridge_items')
         .stream(primaryKey: ['id'])
@@ -67,9 +73,18 @@ class SupabaseService {
         .map((rows) => rows.map((e) => FridgeItem.fromJson(e)).toList());
   }
 
-  /// Add a new fridge item
-  Future<void> addFridgeItem(FridgeItem item) async {
-    await _client.from('fridge_items').insert(item.toJson());
+  /// Add a new fridge item. Returns the inserted row (including its
+  /// database-generated id) so callers can use the real id afterwards
+  /// (e.g. to schedule a notification tied to this specific item).
+  Future<FridgeItem> addFridgeItem(FridgeItem item) async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) {
+      throw Exception('You must be signed in to add an item.');
+    }
+    final data = item.toJson()..['user_id'] = userId;
+    final response =
+        await _client.from('fridge_items').insert(data).select().single();
+    return FridgeItem.fromJson(response);
   }
 
   /// Update fridge item

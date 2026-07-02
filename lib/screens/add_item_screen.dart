@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../providers/fridge_provider.dart';
 import '../models/fridge_item.dart';
 import '../theme.dart';
+import 'barcode_scanner_screen.dart';
 
 class AddItemScreen extends StatefulWidget {
   final FridgeItem? editItem;
@@ -16,11 +17,13 @@ class AddItemScreen extends StatefulWidget {
 class _AddItemScreenState extends State<AddItemScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameCtrl = TextEditingController();
-  final _weightCtrl = TextEditingController();
   final _notesCtrl = TextEditingController();
+  final _brandCtrl = TextEditingController();
 
   DateTime _expiryDate = DateTime.now().add(const Duration(days: 7));
+  DateTime _addedDate = DateTime.now();
   String _category = 'Other';
+  String? _imageUrl;
   bool _saving = false;
 
   @override
@@ -29,11 +32,32 @@ class _AddItemScreenState extends State<AddItemScreen> {
     if (widget.editItem != null) {
       final item = widget.editItem!;
       _nameCtrl.text = item.name;
-      _weightCtrl.text = item.weightGrams.toStringAsFixed(0);
       _notesCtrl.text = item.notes ?? '';
       _expiryDate = item.expiryDate;
+      _addedDate = item.addedDate;
       _category = item.category;
     }
+  }
+
+  Future<void> _scanBarcode() async {
+    final result = await Navigator.push<ScannedProduct>(
+      context,
+      MaterialPageRoute(builder: (_) => const BarcodeScannerScreen()),
+    );
+    if (result == null || !mounted) return;
+
+    setState(() {
+      if (result.name != null) _nameCtrl.text = result.name!;
+      if (result.brand != null) _brandCtrl.text = result.brand!;
+      if (result.imageUrl != null) _imageUrl = result.imageUrl;
+      _addedDate = DateTime.now(); // stamp "date added" at the moment of scan
+
+      if (result.name == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Scanned: ${result.barcode} (no product info found, please fill in manually)')),
+        );
+      }
+    });
   }
 
   Future<void> _pickDate() async {
@@ -56,14 +80,26 @@ class _AddItemScreenState extends State<AddItemScreen> {
     setState(() => _saving = true);
 
     try {
+      final combinedNotes = [
+        if (_brandCtrl.text.trim().isNotEmpty) 'Brand: ${_brandCtrl.text.trim()}',
+        if (_notesCtrl.text.trim().isNotEmpty) _notesCtrl.text.trim(),
+      ].join(' • ');
+
       final item = FridgeItem(
         id: widget.editItem?.id ?? '',
         name: _nameCtrl.text.trim(),
-        weightGrams: double.parse(_weightCtrl.text),
+        // Weight is no longer collected in the UI. Preserve it if we're
+        // editing an older item that already had a weight value saved.
+        weightGrams: widget.editItem?.weightGrams,
         expiryDate: _expiryDate,
-        addedDate: widget.editItem?.addedDate ?? DateTime.now(),
+        addedDate: _addedDate,
         category: _category,
-        notes: _notesCtrl.text.isEmpty ? null : _notesCtrl.text,
+        notes: combinedNotes.isEmpty ? null : combinedNotes,
+        // TODO: once `brand` and `imageUrl` columns/fields exist on FridgeItem
+        // and in the `fridge_items` table, pass them here directly instead
+        // of folding brand into notes as a temporary workaround:
+        // brand: _brandCtrl.text.trim().isEmpty ? null : _brandCtrl.text.trim(),
+        // imageUrl: _imageUrl,
       );
 
       final provider = context.read<FridgeProvider>();
@@ -97,15 +133,53 @@ class _AddItemScreenState extends State<AddItemScreen> {
         child: ListView(
           padding: const EdgeInsets.all(20),
           children: [
+            // Scanned product image preview
+            if (_imageUrl != null) ...[
+              Center(
+                child: Container(
+                  width: 120,
+                  height: 120,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppTheme.border),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: Image.network(
+                    _imageUrl!,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) =>
+                        const Icon(Icons.image_not_supported_outlined, color: AppTheme.textSecondary),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+
             // Name
             TextFormField(
               controller: _nameCtrl,
               textCapitalization: TextCapitalization.words,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'Item Name *',
-                prefixIcon: Icon(Icons.kitchen_outlined),
+                prefixIcon: const Icon(Icons.kitchen_outlined),
+                suffixIcon: IconButton(
+                  icon: const Icon(Icons.qr_code_scanner_rounded),
+                  tooltip: 'Scan barcode',
+                  onPressed: _scanBarcode,
+                ),
               ),
               validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+            ),
+            const SizedBox(height: 14),
+
+            // Brand (auto-filled from scan, editable)
+            TextFormField(
+              controller: _brandCtrl,
+              textCapitalization: TextCapitalization.words,
+              decoration: const InputDecoration(
+                labelText: 'Brand (optional)',
+                prefixIcon: Icon(Icons.storefront_outlined),
+              ),
             ),
             const SizedBox(height: 14),
 
@@ -119,24 +193,6 @@ class _AddItemScreenState extends State<AddItemScreen> {
               items: kFoodCategories.map((cat) =>
                   DropdownMenuItem(value: cat, child: Text(cat))).toList(),
               onChanged: (v) => setState(() => _category = v!),
-            ),
-            const SizedBox(height: 14),
-
-            // Weight
-            TextFormField(
-              controller: _weightCtrl,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'Weight (grams) *',
-                prefixIcon: Icon(Icons.scale_outlined),
-                suffixText: 'g',
-              ),
-              validator: (v) {
-                if (v == null || v.isEmpty) return 'Required';
-                final n = double.tryParse(v);
-                if (n == null || n <= 0) return 'Enter a valid weight';
-                return null;
-              },
             ),
             const SizedBox(height: 14),
 
@@ -166,6 +222,29 @@ class _AddItemScreenState extends State<AddItemScreen> {
                       size: 16, color: AppTheme.textSecondary),
                 ]),
               ),
+            ),
+            const SizedBox(height: 14),
+
+            // Date added (auto, read-only)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                color: AppTheme.bgLight,
+                border: Border.all(color: AppTheme.border),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(children: [
+                const Icon(Icons.add_circle_outline_rounded,
+                    size: 20, color: AppTheme.textSecondary),
+                const SizedBox(width: 12),
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  const Text('Date Added',
+                      style: TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+                  const SizedBox(height: 2),
+                  Text(DateFormat('dd MMMM yyyy').format(_addedDate),
+                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
+                ]),
+              ]),
             ),
             const SizedBox(height: 14),
 

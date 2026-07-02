@@ -60,19 +60,6 @@ class SensorScreen extends StatelessWidget {
             safeMin: 30, safeMax: 80,
           ),
 
-          const SizedBox(height: 16),
-
-          // Weight chart
-          _ChartCard(
-            title: 'Total Weight (g)',
-            subtitle: 'All items combined',
-            icon: Icons.scale_outlined,
-            color: Colors.orange.shade700,
-            spots: history.asMap().entries.map((e) =>
-                FlSpot(e.key.toDouble(), e.value.totalWeightGrams)).toList(),
-            minY: 0, maxY: null,
-          ),
-
           const SizedBox(height: 80),
         ],
       ),
@@ -126,9 +113,9 @@ class _LiveBanner extends StatelessWidget {
             )),
             Container(width: 1, height: 40, color: Colors.white24),
             Expanded(child: _LiveStat(
-              label: 'Weight',
-              value: '${sensor.totalWeightGrams.toStringAsFixed(0)}g',
-              ok: true,
+              label: 'Door',
+              value: sensor.isDoorOpen ? 'Open' : 'Closed',
+              ok: !sensor.isDoorOpen,
             )),
           ]),
         ],

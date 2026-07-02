@@ -135,17 +135,19 @@ class ItemDetailScreen extends StatelessWidget {
             child: Column(
               children: [
                 _DetailRow('Category', item.category, Icons.category_outlined),
-                const Divider(
-                  height: 1,
-                  color: AppTheme.border,
-                  indent: 16,
-                  endIndent: 16,
-                ),
-                _DetailRow(
-                  'Weight',
-                  '${item.weightGrams.toStringAsFixed(0)} g',
-                  Icons.scale_outlined,
-                ),
+                if (item.weightGrams != null) ...[
+                  const Divider(
+                    height: 1,
+                    color: AppTheme.border,
+                    indent: 16,
+                    endIndent: 16,
+                  ),
+                  _DetailRow(
+                    'Weight',
+                    '${item.weightGrams!.toStringAsFixed(0)} g',
+                    Icons.scale_outlined,
+                  ),
+                ],
                 const Divider(
                   height: 1,
                   color: AppTheme.border,
@@ -180,35 +182,6 @@ class ItemDetailScreen extends StatelessWidget {
               ],
             ),
           ),
-
-          // Alerts
-          if (item.isLowWeight) ...[
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: AppTheme.warning.withOpacity(0.08),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: AppTheme.warning.withOpacity(0.3)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.info_outline_rounded,
-                    color: AppTheme.warning,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 10),
-                  const Expanded(
-                    child: Text(
-                      'Weight is below 100g. Consider restocking this item.',
-                      style: TextStyle(color: AppTheme.warning, fontSize: 13),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
         ],
       ),
     );

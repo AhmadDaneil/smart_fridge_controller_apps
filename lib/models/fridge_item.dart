@@ -3,7 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 class FridgeItem {
   final String id;
   final String name;
-  final double weightGrams;
+  final double? weightGrams;
   final DateTime expiryDate;
   final DateTime addedDate;
   final String category;
@@ -12,7 +12,7 @@ class FridgeItem {
   FridgeItem({
     required this.id,
     required this.name,
-    required this.weightGrams,
+    this.weightGrams,
     required this.expiryDate,
     required this.addedDate,
     required this.category,
@@ -23,7 +23,7 @@ class FridgeItem {
     return FridgeItem(
       id: json['id'].toString(),
       name: json['name'] as String,
-      weightGrams: (json['weight_grams'] as num).toDouble(),
+      weightGrams: (json['weight_grams'] as num?)?.toDouble(),
       expiryDate: DateTime.parse(json['expiry_date'] as String),
       addedDate: DateTime.parse(json['added_date'] as String),
       category: json['category'] as String? ?? 'Other',
@@ -49,7 +49,10 @@ class FridgeItem {
 
   bool get isExpired => daysUntilExpiry < 0;
   bool get isExpiringSoon => daysUntilExpiry >= 0 && daysUntilExpiry <= 3;
-  bool get isLowWeight => weightGrams < 100;
+  // No longer used now that weight tracking is removed from the UI, but
+  // kept safe (returns false instead of crashing) in case old data or
+  // other code still references it.
+  bool get isLowWeight => weightGrams != null && weightGrams! < 100;
 
   ExpiryStatus get expiryStatus {
     if (isExpired) return ExpiryStatus.expired;
