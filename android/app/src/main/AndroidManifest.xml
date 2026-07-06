@@ -10,9 +10,9 @@
     
 
     <application
-        android:label="smart_fridge_controller_apps"
+        android:label="Chill Track"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/launcher_icon">
 
         <activity
             android:name=".MainActivity"
