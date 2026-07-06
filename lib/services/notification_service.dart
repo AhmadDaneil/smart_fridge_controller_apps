@@ -115,6 +115,35 @@ class NotificationService {
     }
   }
 
+  Future<void> showImmediateNotification({
+  required String id,
+  required String title,
+  required String body,
+}) async {
+  try {
+    const androidDetails = AndroidNotificationDetails(
+      'expiry_channel',
+      'Expiry Reminders',
+      channelDescription: 'Reminds you when food items are about to expire',
+      importance: Importance.high,
+      priority: Priority.high,
+    );
+    const details = NotificationDetails(
+      android: androidDetails,
+      iOS: DarwinNotificationDetails(),
+    );
+
+    await _plugin.show(
+      _idFor(id),
+      title,
+      body,
+      details,
+    );
+  } catch (e) {
+    debugPrint('Could not show immediate notification: $e');
+  }
+}
+
   Future<void> cancelReminder(String itemId) async {
     await _plugin.cancel(_idFor(itemId));
   }

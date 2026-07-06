@@ -61,11 +61,30 @@ class FridgeProvider extends ChangeNotifier {
     });
   }
 
+  void _checkImmediateAlerts(List<FridgeItem> items) {
+  for (final item in items) {
+    if (item.isExpired) {
+      NotificationService().showImmediateNotification(
+        id: item.id,
+        title: '🚨 ${item.name} has expired!',
+        body: 'Expired ${-item.daysUntilExpiry} day(s) ago. Please remove it.',
+      );
+    } else if (item.isExpiringSoon) {
+      NotificationService().showImmediateNotification(
+        id: item.id,
+        title: '⏰ ${item.name} expiring soon',
+        body: 'Expires in ${item.daysUntilExpiry} day(s). Use it up!',
+      );
+    }
+  }
+}
+
   void _listenItems() {
   // Fetch immediately on init
   _service.getFridgeItems().then((items) {
     _items = items;
     _loading = false;
+    _checkImmediateAlerts(items); 
     notifyListeners();
   });
 
@@ -73,6 +92,7 @@ class FridgeProvider extends ChangeNotifier {
   _itemsSub = _service.fridgeItemsStream().listen((items) {
     _items = items;
     _loading = false;
+    _checkImmediateAlerts(items); 
     notifyListeners();
   }, onError: (e) {
     _error = e.toString();
@@ -105,6 +125,7 @@ class FridgeProvider extends ChangeNotifier {
   Future<void> addItem(FridgeItem item) async {
     final saved = await _service.addFridgeItem(item);
     await NotificationService().scheduleExpiryReminder(saved);
+    await NotificationService().scheduleExpiryReminder(item);
   }
 
   Future<void> updateItem(FridgeItem item) async {
