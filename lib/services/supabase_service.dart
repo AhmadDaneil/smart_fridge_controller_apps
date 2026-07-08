@@ -13,6 +13,7 @@ class SupabaseService {
 
   /// Fetch latest sensor reading from ESP32
   Future<SensorData?> getLatestSensorData() async {
+  try {
     final response = await _client
         .from('sensor_readings')
         .select()
@@ -21,18 +22,26 @@ class SupabaseService {
         .maybeSingle();
     if (response == null) return null;
     return SensorData.fromJson(response);
+  } catch (e) {
+    print('Error fetching sensor data: $e');
+    return null;
   }
+}
 
   /// Stream real-time sensor updates (Supabase Realtime)
   Stream<SensorData> sensorDataStream() {
-    return _client
-        .from('sensor_readings')
-        .stream(primaryKey: ['id'])
-        .order('created_at', ascending: false)
-        .limit(1)
-        .map((rows) => rows.isEmpty ? SensorData.empty() : SensorData.fromJson(rows.first));
-  }
-
+  return _client
+      .from('sensor_readings')
+      .stream(primaryKey: ['id'])
+      .order('created_at', ascending: false)
+      .limit(1)
+      .map((rows) {
+        print('Sensor stream received: ${rows.length} rows');  // ADD - debug
+        if (rows.isEmpty) return SensorData.empty();
+        print('Sensor data: ${rows.first}');                   // ADD - debug
+        return SensorData.fromJson(rows.first);
+      });
+}
   /// Fetch last N sensor readings for chart
   Future<List<SensorData>> getSensorHistory({int limit = 24}) async {
     final response = await _client

@@ -102,20 +102,24 @@ class FridgeProvider extends ChangeNotifier {
 }
 
   void _listenSensor() {
-    _sensorSub = _service.sensorDataStream().listen((data) {
+  // Fetch immediately on init — don't wait for stream
+  _service.getLatestSensorData().then((data) {
+    if (data != null) {
+      debugPrint('Initial sensor fetch: ${data.temperature}°C ${data.humidity}%');
       _sensorData = data;
-      _trackDoorState(data.isDoorOpen);
       notifyListeners();
-    });
-  }
-
-  void _trackDoorState(bool isOpen) {
-    if (isOpen && _doorOpenedAt == null) {
-      _doorOpenedAt = DateTime.now();
-    } else if (!isOpen) {
-      _doorOpenedAt = null;
     }
-  }
+  });
+
+  // Then keep listening for realtime updates
+  _sensorSub = _service.sensorDataStream().listen((data) {
+    debugPrint('Sensor update: ${data.temperature}°C ${data.humidity}%');
+    _sensorData = data;
+    notifyListeners();
+  }, onError: (e) {
+    debugPrint('Sensor stream error: $e');
+  });
+}
 
   Future<void> _loadHistory() async {
     _sensorHistory = await _service.getSensorHistory(limit: 24);
@@ -141,11 +145,15 @@ class FridgeProvider extends ChangeNotifier {
   }
 
   Future<void> refresh() async {
-    final items = await _service.getFridgeItems();
-    _items = items;
-    notifyListeners();
-    await _loadHistory();
-  }
+  final results = await Future.wait([
+    _service.getFridgeItems(),
+    _service.getLatestSensorData(),   // ADD THIS
+    _loadHistory(),
+  ]);
+  _items = results[0] as List<FridgeItem>;
+  _sensorData = results[1] as SensorData?;  // ADD THIS
+  notifyListeners();
+}
 
   @override
   void dispose() {

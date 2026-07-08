@@ -14,16 +14,16 @@ class SensorData {
   });
 
   factory SensorData.fromJson(Map<String, dynamic> json) {
-    return SensorData(
-      id: json['id'].toString(),
-      temperature: (json['temperature'] as num).toDouble(),
-      humidity: (json['humidity'] as num).toDouble(),
-      // Reed switch reading from the ESP32. Defaults to false (closed) if
-      // the column is missing so older rows don't crash the app.
-      isDoorOpen: json['door_open'] as bool? ?? false,
-      createdAt: DateTime.parse(json['created_at'] as String),
-    );
-  }
+  return SensorData(
+    id: json['id']?.toString() ?? '',
+    temperature: (json['temperature'] as num?)?.toDouble() ?? 0.0,   // null safe
+    humidity: (json['humidity'] as num?)?.toDouble() ?? 0.0,          // null safe
+    isDoorOpen: json['door_open'] as bool? ?? false,                 // null safe
+    createdAt: json['created_at'] != null 
+        ? DateTime.parse(json['created_at'] as String)
+        : DateTime.now(),
+  );
+}
 
   factory SensorData.empty() {
     return SensorData(

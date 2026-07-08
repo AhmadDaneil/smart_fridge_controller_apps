@@ -73,7 +73,26 @@ class DashboardScreen extends StatelessWidget {
                 _SectionLabel('Live Sensor Readings'),
                 const SizedBox(height: 10),
                 if (sensor == null)
-                  _shimmerPlaceholder()
+  GestureDetector(
+    onTap: () => context.read<FridgeProvider>().refresh(),  // tap to retry
+    child: Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.border),
+      ),
+      child: const Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.sensors_off_rounded, color: AppTheme.textSecondary),
+          SizedBox(width: 8),
+          Text('No sensor data — tap to retry',
+              style: TextStyle(color: AppTheme.textSecondary, fontSize: 13)),
+        ],
+      ),
+    ),
+  )
                 else
                   Row(
                     children: [
