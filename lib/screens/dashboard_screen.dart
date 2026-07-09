@@ -94,59 +94,33 @@ class DashboardScreen extends StatelessWidget {
     ),
   )
                 else
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _SensorTile(
-                          icon: Icons.thermostat_rounded,
-                          label: 'Temperature',
-                          value: '${sensor.temperature.toStringAsFixed(1)}°C',
-                          status:
-                              sensor.temperatureStatus ==
-                                  TemperatureStatus.normal
-                              ? _StatusLevel.good
-                              : _StatusLevel.bad,
-                          subtitle:
-                              sensor.temperatureStatus ==
-                                  TemperatureStatus.normal
-                              ? 'Normal'
-                              : 'Out of range',
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: _SensorTile(
-                          icon: Icons.water_drop_outlined,
-                          label: 'Humidity',
-                          value: '${sensor.humidity.toStringAsFixed(0)}%',
-                          status: sensor.isHumidityNormal
-                              ? _StatusLevel.good
-                              : _StatusLevel.warn,
-                          subtitle: sensor.isHumidityNormal
-                              ? 'Normal'
-                              : 'Check fridge',
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: _SensorTile(
-                          icon: sensor.isDoorOpen
-                              ? Icons.door_front_door_rounded
-                              : Icons.door_front_door_outlined,
-                          label: 'Door',
-                          value: sensor.isDoorOpen ? 'Open' : 'Closed',
-                          status: sensor.isDoorOpen
-                              ? (provider.isDoorLeftOpen
-                                  ? _StatusLevel.bad
-                                  : _StatusLevel.warn)
-                              : _StatusLevel.good,
-                          subtitle: provider.isDoorLeftOpen
-                              ? 'Left open!'
-                              : (sensor.isDoorOpen ? 'Just opened' : 'Secure'),
-                        ),
-                      ),
-                    ],
-                  ),
+                  // REPLACE WITH THIS
+Row(
+  crossAxisAlignment: CrossAxisAlignment.start,
+  children: [
+    Expanded(
+      child: _SensorTile(
+        icon: Icons.thermostat_rounded,
+        label: 'Temperature',
+        value: '${sensor.temperature.toStringAsFixed(1)}°C',
+        status: sensor.temperatureStatus == TemperatureStatus.normal
+            ? _StatusLevel.good : _StatusLevel.bad,
+        subtitle: sensor.temperatureStatus == TemperatureStatus.normal
+            ? 'Normal' : 'Out of range',
+      ),
+    ),
+    const SizedBox(width: 10),       // CHANGE 12 → 10
+    Expanded(
+      child: _SensorTile(
+        icon: Icons.water_drop_outlined,
+        label: 'Humidity',
+        value: '${sensor.humidity.toStringAsFixed(0)}%',
+        status: sensor.isHumidityNormal ? _StatusLevel.good : _StatusLevel.warn,
+        subtitle: sensor.isHumidityNormal ? 'Normal' : 'Check fridge',
+      ),
+    ),
+  ],
+),
 
                 const SizedBox(height: 20),
 
@@ -316,7 +290,7 @@ class _SensorTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -327,42 +301,44 @@ class _SensorTile extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(icon, color: _color, size: 20),
-              const SizedBox(width: 6),
-              Text(
-                label,
+              Icon(icon, color: _color, size: 18),
+              const SizedBox(width: 5),
+              Flexible(                                       // ADD Flexible
+              child: Text(label,
+                overflow: TextOverflow.ellipsis,           // ADD overflow
                 style: const TextStyle(
-                  fontSize: 12,
-                  color: AppTheme.textSecondary,
-                ),
-              ),
+                    fontSize: 11,                          // CHANGE 12 → 11
+                    color: AppTheme.textSecondary)),
+            ),
             ],
           ),
           const SizedBox(height: 8),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.w700,
-              color: _color,
-            ),
+          FittedBox(                                        // ADD FittedBox
+            fit: BoxFit.scaleDown,                         // shrinks if too wide
+            alignment: Alignment.centerLeft,
+            child: Text(value,
+                style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w700,
+                    color: _color)),
           ),
           const SizedBox(height: 4),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            decoration: BoxDecoration(
-              color: _color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Text(
-              subtitle,
-              style: TextStyle(
-                fontSize: 11,
-                color: _color,
-                fontWeight: FontWeight.w600,
+          FittedBox(                                        // ADD FittedBox
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: _color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(20),
               ),
+              child: Text(subtitle,
+                  style: TextStyle(
+                      fontSize: 11,
+                      color: _color,
+                      fontWeight: FontWeight.w600)),
             ),
-          ),
+          )
         ],
       ),
     );

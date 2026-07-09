@@ -10,7 +10,7 @@
     
 
     <application
-        android:label="Chill Track"
+        android:label="Chill Coder"
         android:name="${applicationName}"
         android:icon="@mipmap/launcher_icon">
 
