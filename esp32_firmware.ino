@@ -1,205 +1,352 @@
-/*
- * CHILL CODERS – ESP32 IoT Firmware (ITT569)
- * Reads DHT22 (temp/humidity) + HX711 (weight)
- * Sends data to Supabase every 30 seconds via HTTPS
- *
- * Libraries required (install via Arduino Library Manager):
- *   - DHT sensor library by Adafruit
- *   - HX711 Arduino Library by bogde
- *   - ArduinoJson by Benoit Blanchon
- *   - HTTPClient (built into ESP32 board package)
- */
-
+#include <Wire.h>
 #include <WiFi.h>
 #include <HTTPClient.h>
-#include <ArduinoJson.h>
-#include <DHT.h>
-#include <HX711.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+#include "DHTesp.h"
+#include <Ticker.h>
 
-// ─── Configuration ─────────────────────────────────────────────────────────
-const char* WIFI_SSID     = "YOUR_WIFI_SSID";
-const char* WIFI_PASSWORD = "YOUR_WIFI_PASSWORD";
+// ==========================
+// WIFI SETTINGS
+// ==========================
+const char* ssid     = "realme C2";
+const char* password = "030507080191";
 
-const char* SUPABASE_URL  = "https://YOUR_PROJECT.supabase.co/rest/v1/sensor_readings";
-const char* SUPABASE_KEY  = "YOUR_ANON_KEY";
+// ==========================
+// SUPABASE SETTINGS
+// ==========================
+const char* supabaseUrl = "https://zthfjixdcbdqqncfnoql.supabase.co/rest/v1/sensor_readings";
+const char* supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp0aGZqaXhkY2JkcXFuY2Zub3FsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExNzYyNzgsImV4cCI6MjA5Njc1MjI3OH0.nJV_08O7KqMm3U0UZYW3y-2tN_Y7RPk3_hPG9bh6Tds";
 
-// ─── Pin Definitions ───────────────────────────────────────────────────────
-#define DHT_PIN       4     // GPIO4 → DHT22 data pin
-#define DHT_TYPE      DHT22
+// ==========================
+// OLED SETTINGS
+// ==========================
+#define SCREEN_WIDTH   128
+#define SCREEN_HEIGHT  64
+#define OLED_RESET     -1
+#define SCREEN_ADDRESS 0x3C
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
-#define HX711_DOUT    16    // GPIO16 → HX711 DT
-#define HX711_SCK     17    // GPIO17 → HX711 SCK
+// ==========================
+// DHT22 SETTINGS
+// ==========================
+DHTesp dht;
+const int dhtPin = 17;
 
-#define BUZZER_PIN    18    // GPIO18 → Buzzer
-#define LED_GREEN     19    // GPIO19 → Green LED (normal)
-#define LED_RED       21    // GPIO21 → Red LED (alert)
+// ==========================
+// REED SWITCH SETTINGS
+// ==========================
+const int reedPin = 4;
 
-// LCD (I2C) – connect SDA→GPIO21, SCL→GPIO22
-// Uncomment if using LCD:
-// #include <LiquidCrystal_I2C.h>
-// LiquidCrystal_I2C lcd(0x27, 16, 2);
+// ==========================
+// LED SETTINGS
+// ==========================
+const int   ledPin        = 23;
+const float tempThreshold = 30.0;
+const int   doorOpenLimit = 10000;
 
-// ─── Temperature thresholds ───────────────────────────────────────────────
-const float TEMP_MIN = 1.0;   // °C
-const float TEMP_MAX = 8.0;   // °C
+// ==========================
+// TASK SETTINGS
+// ==========================
+TaskHandle_t tempTaskHandle = NULL;
+Ticker tempTicker;
+bool tasksEnabled = false;
 
-// ─── Objects ──────────────────────────────────────────────────────────────
-DHT    dht(DHT_PIN, DHT_TYPE);
-HX711  scale;
+// ==========================
+// VARIABLES
+// ==========================
+float temperature  = 0;
+float humidity     = 0;
+bool  doorOpen     = false;
+unsigned long doorOpenTime = 0;
+bool  doorAlerted  = false;
+bool  tempAlerted  = false;
+bool  ledTempAlert = false;
+bool  ledDoorAlert = false;
 
-// ─── Calibration ──────────────────────────────────────────────────────────
-// Run calibration sketch first to find your scale factor
-float SCALE_FACTOR = 420.0;   // Adjust after calibration
+// ==========================
+// FUNCTION DECLARATIONS
+// ==========================
+void tempTask(void *pvParameters);
+bool getTemperature();
+void triggerGetTemp();
+void ledBlink(int times);
+void sendToSupabase();
+void updateOLED();
+void showWifiConnecting();
+void showWifiConnected();
 
-// ─── Globals ──────────────────────────────────────────────────────────────
-unsigned long lastSendTime = 0;
-const unsigned long SEND_INTERVAL = 30000; // 30 seconds
-
-// ──────────────────────────────────────────────────────────────────────────
+// ============================================================
+// SETUP
+// ============================================================
 void setup() {
   Serial.begin(115200);
-  delay(500);
 
-  // GPIO setup
-  pinMode(BUZZER_PIN, OUTPUT);
-  pinMode(LED_GREEN, OUTPUT);
-  pinMode(LED_RED, OUTPUT);
+  if (!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
+    Serial.println("SSD1306 failed!");
+    while (true);
+  }
 
-  // Init sensors
-  dht.begin();
-  scale.begin(HX711_DOUT, HX711_SCK);
-  scale.set_scale(SCALE_FACTOR);
-  scale.tare(); // Reset scale to zero
+  display.clearDisplay();
+  display.setTextSize(2);
+  display.setTextColor(WHITE);
+  display.setCursor(10, 20);
+  display.println("STARTING");
+  display.display();
+  delay(1500);
 
-  // Init LCD
-  // lcd.init(); lcd.backlight();
-  // lcd.print("Chill Coders");
+  pinMode(ledPin, OUTPUT);
+  digitalWrite(ledPin, LOW);
+  pinMode(reedPin, INPUT_PULLUP);   // FIX — use INPUT_PULLUP for reed switch
 
-  Serial.println("Chill Coders IoT – Smart Fridge System");
-  Serial.println("Connecting to WiFi...");
+  ledBlink(2);
 
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-  int attempts = 0;
-  while (WiFi.status() != WL_CONNECTED && attempts < 30) {
+  showWifiConnecting();
+  WiFi.begin(ssid, password);
+  int retry = 0;
+  while (WiFi.status() != WL_CONNECTED && retry < 20) {
     delay(500);
     Serial.print(".");
-    attempts++;
+    retry++;
   }
 
   if (WiFi.status() == WL_CONNECTED) {
-    Serial.println("\nWiFi connected! IP: " + WiFi.localIP().toString());
-    blinkLED(LED_GREEN, 3);
+    Serial.println("\nWiFi Connected!");
+    showWifiConnected();
+    delay(1500);
   } else {
-    Serial.println("\nWiFi failed! Running offline.");
-    blinkLED(LED_RED, 5);
+    Serial.println("\nWiFi FAILED");
+    display.clearDisplay();
+    display.setTextSize(1);
+    display.setCursor(0, 20);
+    display.println("WiFi FAILED");
+    display.println("Running offline..");
+    display.display();
+    delay(2000);
+  }
+
+  dht.setup(dhtPin, DHTesp::DHT22);
+  xTaskCreatePinnedToCore(tempTask, "tempTask", 4000, NULL, 5, &tempTaskHandle, 1);
+  if (tempTaskHandle != NULL) {
+    tempTicker.attach(5, triggerGetTemp);
+  }
+
+  tasksEnabled = true;
+  if (tempTaskHandle != NULL) {
+    vTaskResume(tempTaskHandle);
   }
 }
 
-// ──────────────────────────────────────────────────────────────────────────
+// ============================================================
+// LOOP
+// ============================================================
 void loop() {
-  unsigned long now = millis();
 
-  // Read sensors
-  float temperature = dht.readTemperature();
-  float humidity    = dht.readHumidity();
-  float weight      = scale.get_units(5); // Average 5 readings
-  if (weight < 0) weight = 0;
+  // FIX — LOW means magnet present (door CLOSED), HIGH means door OPEN
+  bool currentDoorState = (digitalRead(reedPin) == LOW);
 
-  // Validate readings
-  if (isnan(temperature) || isnan(humidity)) {
-    Serial.println("DHT22 read error!");
-    delay(2000);
-    return;
-  }
+  if (currentDoorState != doorOpen) {
+    delay(50);   // FIX — shorter debounce (was 500ms, too slow)
+    bool confirmState = (digitalRead(reedPin) == LOW);   // FIX — match same logic
 
-  Serial.printf("Temp: %.1f°C  Humidity: %.1f%%  Weight: %.0fg\n",
-    temperature, humidity, weight);
+    if (confirmState == currentDoorState) {
+      doorOpen = currentDoorState;
 
-  // Handle alerts
-  bool tempAlert = (temperature < TEMP_MIN || temperature > TEMP_MAX);
-  updateIndicators(tempAlert);
-
-  // Update LCD
-  // updateLCD(temperature, humidity, weight);
-
-  // Send to Supabase every interval
-  if (now - lastSendTime >= SEND_INTERVAL) {
-    if (WiFi.status() == WL_CONNECTED) {
-      bool sent = sendToSupabase(temperature, humidity, weight);
-      if (sent) {
-        Serial.println("Data sent to Supabase ✓");
-        lastSendTime = now;
+      if (doorOpen) {
+        doorOpenTime = millis();
+        doorAlerted  = false;
+        ledDoorAlert = false;
+        Serial.println("Pintu DIBUKA");
+      } else {
+        Serial.println("Pintu DITUTUP");
+        doorAlerted  = false;
+        ledDoorAlert = false;
+        doorOpenTime = 0;
+        digitalWrite(ledPin, LOW);
       }
-    } else {
-      Serial.println("WiFi disconnected, attempting reconnect...");
-      WiFi.reconnect();
     }
   }
 
-  delay(2000);
+  // Check pintu buka lama
+  if (doorOpen && !doorAlerted) {
+    if (millis() - doorOpenTime >= doorOpenLimit) {
+      Serial.println("ALERT: Pintu terbuka terlalu lama!");
+      doorAlerted  = true;
+      ledDoorAlert = true;
+    }
+  }
+
+  // LED door alert
+  if (ledDoorAlert && doorOpen) {
+    ledBlink(3);
+    ledDoorAlert = false;
+  } else if (!doorOpen) {
+    digitalWrite(ledPin, LOW);
+  }
+
+  // LED temp alert
+  if (ledTempAlert) {
+    ledBlink(2);
+    ledTempAlert = false;
+  }
+
+  updateOLED();
+  delay(300);
 }
 
-// ──────────────────────────────────────────────────────────────────────────
-bool sendToSupabase(float temp, float hum, float weight) {
+// ============================================================
+// TASK: Baca DHT22
+// ============================================================
+void tempTask(void *pvParameters) {
+  while (1) {
+    if (tasksEnabled) { getTemperature(); }
+    vTaskSuspend(NULL);
+  }
+}
+
+void triggerGetTemp() {
+  if (tempTaskHandle != NULL) { xTaskResumeFromISR(tempTaskHandle); }
+}
+
+// ============================================================
+// BACA DHT22 + HANTAR KE SUPABASE
+// ============================================================
+bool getTemperature() {
+  TempAndHumidity data = dht.getTempAndHumidity();
+  if (dht.getStatus() != 0) {
+    Serial.println("DHT22 Error: " + String(dht.getStatusString()));
+    return false;
+  }
+
+  temperature = data.temperature;
+  humidity    = data.humidity;
+
+  Serial.println("Temp: "     + String(temperature) + " C");
+  Serial.println("Humidity: " + String(humidity)    + " %");
+  Serial.println("Door: "     + String(doorOpen ? "OPEN" : "CLOSED"));
+  Serial.println("------------------------");
+
+  if (temperature > tempThreshold && !tempAlerted) {
+    Serial.println("WARNING: SUHU TINGGI!");
+    ledTempAlert = true;
+    tempAlerted  = true;
+  } else if (temperature <= tempThreshold) {
+    tempAlerted = false;
+  }
+
+  if (WiFi.status() == WL_CONNECTED) { sendToSupabase(); }   // FIX — no parameters
+  return true;
+}
+
+// ============================================================
+// HANTAR DATA KE SUPABASE — FIXED
+// ============================================================
+void sendToSupabase() {
+  if (WiFi.status() != WL_CONNECTED) return;
+
   HTTPClient http;
-  http.begin(SUPABASE_URL);
+  http.begin(supabaseUrl);
   http.addHeader("Content-Type", "application/json");
-  http.addHeader("apikey", SUPABASE_KEY);
-  http.addHeader("Authorization", String("Bearer ") + SUPABASE_KEY);
+  http.addHeader("apikey", supabaseKey);
+  http.addHeader("Authorization", String("Bearer ") + supabaseKey);
   http.addHeader("Prefer", "return=minimal");
 
-  // Build JSON
-  StaticJsonDocument<256> doc;
-  doc["temperature"]         = round(temp * 10.0) / 10.0;
-  doc["humidity"]            = round(hum * 10.0) / 10.0;
-  doc["total_weight_grams"]  = round(weight);
+  String payload = "{";
+  payload += "\"temperature\":"  + String(temperature, 1) + ",";
+  payload += "\"humidity\":"     + String(humidity, 1)    + ",";
+  payload += "\"door_open\":"    + String(doorOpen ? "true" : "false");
+  payload += "}";
 
-  String payload;
-  serializeJson(doc, payload);
+  Serial.println("Sending: " + payload);
 
   int httpCode = http.POST(payload);
-  bool success = (httpCode == 201);
 
-  if (!success) {
-    Serial.printf("HTTP error: %d – %s\n", httpCode, http.getString().c_str());
+  if (httpCode == 201) {
+    Serial.println("Supabase OK ✓");
+  } else {
+    Serial.println("Supabase ERROR: " + String(httpCode));
+    Serial.println(http.getString());
   }
 
   http.end();
-  return success;
 }
 
-// ──────────────────────────────────────────────────────────────────────────
-void updateIndicators(bool alert) {
-  if (alert) {
-    digitalWrite(LED_GREEN, LOW);
-    digitalWrite(LED_RED, HIGH);
-    // Sound buzzer briefly
-    tone(BUZZER_PIN, 1000, 200);
-    delay(300);
-    tone(BUZZER_PIN, 800, 200);
-  } else {
-    digitalWrite(LED_GREEN, HIGH);
-    digitalWrite(LED_RED, LOW);
-    noTone(BUZZER_PIN);
+// ============================================================
+// UPDATE OLED
+// ============================================================
+void updateOLED() {
+  display.clearDisplay();
+  display.setTextColor(WHITE);
+
+  display.setTextSize(1);
+  display.setCursor(10, 0);
+  display.println("SMART FRIDGE");
+  display.drawLine(0, 10, 128, 10, WHITE);
+
+  display.setCursor(0, 14);
+  display.print("Temp:");
+  display.setTextSize(2);
+  display.setCursor(0, 23);
+  display.print(temperature, 1);
+  display.print("C");
+
+  display.setTextSize(1);
+  display.setCursor(80, 14);
+  display.print("Hum:");
+  display.setCursor(80, 24);
+  display.print(humidity, 1);
+  display.print("%");
+
+  display.drawLine(0, 43, 128, 43, WHITE);
+  display.setTextSize(1);
+  display.setCursor(0, 46);
+  display.print("Door: ");
+  display.print(doorOpen ? "OPEN" : "CLOSED");
+
+  if (temperature > tempThreshold) {
+    display.setCursor(70, 46);
+    display.print("!TEMP!");
   }
+
+  if (doorOpen && doorAlerted) {
+    display.setCursor(0, 56);
+    display.print("DOOR OPEN TOO LONG!");
+  }
+
+  display.display();
 }
 
-// ──────────────────────────────────────────────────────────────────────────
-void blinkLED(int pin, int times) {
+// ============================================================
+// LED BLINK
+// ============================================================
+void ledBlink(int times) {
   for (int i = 0; i < times; i++) {
-    digitalWrite(pin, HIGH);
-    delay(200);
-    digitalWrite(pin, LOW);
-    delay(200);
+    digitalWrite(ledPin, HIGH);
+    delay(300);
+    digitalWrite(ledPin, LOW);
+    delay(300);
   }
 }
 
-/*
-void updateLCD(float temp, float hum, float weight) {
-  lcd.clear();
-  lcd.setCursor(0, 0);
-  lcd.printf("T:%.1fC H:%.0f%%", temp, hum);
-  lcd.setCursor(0, 1);
-  lcd.printf("Wt:%.0fg", weight);
+// ============================================================
+// WIFI STATUS OLED
+// ============================================================
+void showWifiConnecting() {
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(WHITE);
+  display.setCursor(10, 20);
+  display.println("Connecting WiFi..");
+  display.display();
 }
-*/
+
+void showWifiConnected() {
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(WHITE);
+  display.setCursor(15, 15);
+  display.println("WiFi Connected!");
+  display.setCursor(5, 30);
+  display.println(WiFi.localIP().toString());
+  display.display();
+}
