@@ -94,6 +94,7 @@ class DashboardScreen extends StatelessWidget {
     ),
   )
                 else
+<<<<<<< HEAD
                   // REPLACE WITH THIS
 Row(
   crossAxisAlignment: CrossAxisAlignment.start,
@@ -121,6 +122,64 @@ Row(
     ),
   ],
 ),
+=======
+                  IntrinsicHeight(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(
+                          child: _SensorTile(
+                            icon: Icons.thermostat_rounded,
+                            label: 'Temperature',
+                            value: '${sensor.temperature.toStringAsFixed(1)}°C',
+                            status:
+                                sensor.temperatureStatus ==
+                                    TemperatureStatus.normal
+                                ? _StatusLevel.good
+                                : _StatusLevel.bad,
+                            subtitle:
+                                sensor.temperatureStatus ==
+                                    TemperatureStatus.normal
+                                ? 'Normal'
+                                : 'Out of range',
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _SensorTile(
+                            icon: Icons.water_drop_outlined,
+                            label: 'Humidity',
+                            value: '${sensor.humidity.toStringAsFixed(0)}%',
+                            status: sensor.isHumidityNormal
+                                ? _StatusLevel.good
+                                : _StatusLevel.warn,
+                            subtitle: sensor.isHumidityNormal
+                                ? 'Normal'
+                                : 'Check fridge',
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _SensorTile(
+                            icon: sensor.isDoorOpen
+                                ? Icons.door_front_door_rounded
+                                : Icons.door_front_door_outlined,
+                            label: 'Door',
+                            value: sensor.isDoorOpen ? 'Open' : 'Closed',
+                            status: sensor.isDoorOpen
+                                ? (provider.isDoorLeftOpen
+                                    ? _StatusLevel.bad
+                                    : _StatusLevel.warn)
+                                : _StatusLevel.good,
+                            subtitle: provider.isDoorLeftOpen
+                                ? 'Left open!'
+                                : (sensor.isDoorOpen ? 'Just opened' : 'Secure'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+>>>>>>> 394d4cfcee8a75386321690591cbd5d73d001607
 
                 const SizedBox(height: 20),
 
@@ -290,7 +349,12 @@ class _SensorTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
+<<<<<<< HEAD
       padding: const EdgeInsets.all(12),
+=======
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+>>>>>>> 394d4cfcee8a75386321690591cbd5d73d001607
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -298,11 +362,13 @@ class _SensorTile extends StatelessWidget {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Row(
             children: [
               Icon(icon, color: _color, size: 18),
               const SizedBox(width: 5),
+<<<<<<< HEAD
               Flexible(                                       // ADD Flexible
               child: Text(label,
                 overflow: TextOverflow.ellipsis,           // ADD overflow
@@ -331,6 +397,53 @@ class _SensorTile extends StatelessWidget {
               decoration: BoxDecoration(
                 color: _color.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(20),
+=======
+              Expanded(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppTheme.textSecondary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          // FittedBox shrinks long values (e.g. "Closed") to fit on one
+          // line instead of wrapping and stretching the card taller than
+          // its neighbours.
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              value,
+              maxLines: 1,
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w700,
+                color: _color,
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: _color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              subtitle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 11,
+                color: _color,
+                fontWeight: FontWeight.w600,
+>>>>>>> 394d4cfcee8a75386321690591cbd5d73d001607
               ),
               child: Text(subtitle,
                   style: TextStyle(
