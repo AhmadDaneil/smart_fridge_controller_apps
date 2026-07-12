@@ -6,17 +6,20 @@
 #include "DHTesp.h"
 #include <Ticker.h>
 
+
 // ==========================
 // WIFI SETTINGS
 // ==========================
 const char* ssid     = "realme C2";
 const char* password = "030507080191";
 
+
 // ==========================
 // SUPABASE SETTINGS
 // ==========================
 const char* supabaseUrl = "https://zthfjixdcbdqqncfnoql.supabase.co/rest/v1/sensor_readings";
 const char* supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp0aGZqaXhkY2JkcXFuY2Zub3FsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExNzYyNzgsImV4cCI6MjA5Njc1MjI3OH0.nJV_08O7KqMm3U0UZYW3y-2tN_Y7RPk3_hPG9bh6Tds";
+
 
 // ==========================
 // OLED SETTINGS
@@ -27,16 +30,19 @@ const char* supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 #define SCREEN_ADDRESS 0x3C
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
+
 // ==========================
 // DHT22 SETTINGS
 // ==========================
 DHTesp dht;
 const int dhtPin = 17;
 
+
 // ==========================
 // REED SWITCH SETTINGS
 // ==========================
 const int reedPin = 4;
+
 
 // ==========================
 // LED SETTINGS
@@ -45,12 +51,14 @@ const int   ledPin        = 23;
 const float tempThreshold = 30.0;
 const int   doorOpenLimit = 10000;
 
+
 // ==========================
 // TASK SETTINGS
 // ==========================
 TaskHandle_t tempTaskHandle = NULL;
 Ticker tempTicker;
 bool tasksEnabled = false;
+
 
 // ==========================
 // VARIABLES
@@ -64,6 +72,7 @@ bool  tempAlerted  = false;
 bool  ledTempAlert = false;
 bool  ledDoorAlert = false;
 
+
 // ==========================
 // FUNCTION DECLARATIONS
 // ==========================
@@ -76,16 +85,19 @@ void updateOLED();
 void showWifiConnecting();
 void showWifiConnected();
 
+
 // ============================================================
 // SETUP
 // ============================================================
 void setup() {
   Serial.begin(115200);
 
+
   if (!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
     Serial.println("SSD1306 failed!");
     while (true);
   }
+
 
   display.clearDisplay();
   display.setTextSize(2);
@@ -95,11 +107,15 @@ void setup() {
   display.display();
   delay(1500);
 
+
   pinMode(ledPin, OUTPUT);
   digitalWrite(ledPin, LOW);
-  pinMode(reedPin, INPUT_PULLUP);   // FIX — use INPUT_PULLUP for reed switch
+  pinMode(reedPin, INPUT);
 
+
+  // Test LED masa startup
   ledBlink(2);
+
 
   showWifiConnecting();
   WiFi.begin(ssid, password);
@@ -109,6 +125,7 @@ void setup() {
     Serial.print(".");
     retry++;
   }
+
 
   if (WiFi.status() == WL_CONNECTED) {
     Serial.println("\nWiFi Connected!");
@@ -125,11 +142,13 @@ void setup() {
     delay(2000);
   }
 
+
   dht.setup(dhtPin, DHTesp::DHT22);
   xTaskCreatePinnedToCore(tempTask, "tempTask", 4000, NULL, 5, &tempTaskHandle, 1);
   if (tempTaskHandle != NULL) {
     tempTicker.attach(5, triggerGetTemp);
   }
+
 
   tasksEnabled = true;
   if (tempTaskHandle != NULL) {
@@ -137,20 +156,24 @@ void setup() {
   }
 }
 
+
 // ============================================================
 // LOOP
 // ============================================================
 void loop() {
 
-  // FIX — LOW means magnet present (door CLOSED), HIGH means door OPEN
-  bool currentDoorState = (digitalRead(reedPin) == LOW);
+
+  bool currentDoorState = (digitalRead(reedPin) == HIGH);
+
 
   if (currentDoorState != doorOpen) {
-    delay(50);   // FIX — shorter debounce (was 500ms, too slow)
-    bool confirmState = (digitalRead(reedPin) == LOW);   // FIX — match same logic
+    delay(500);
+    bool confirmState = (digitalRead(reedPin) == HIGH);
+
 
     if (confirmState == currentDoorState) {
       doorOpen = currentDoorState;
+
 
       if (doorOpen) {
         doorOpenTime = millis();
@@ -162,10 +185,11 @@ void loop() {
         doorAlerted  = false;
         ledDoorAlert = false;
         doorOpenTime = 0;
-        digitalWrite(ledPin, LOW);
+        digitalWrite(ledPin, LOW);  // matikan LED terus
       }
     }
   }
+
 
   // Check pintu buka lama
   if (doorOpen && !doorAlerted) {
@@ -176,7 +200,8 @@ void loop() {
     }
   }
 
-  // LED door alert
+
+  // LED door alert — blink 3x kalau pintu still open
   if (ledDoorAlert && doorOpen) {
     ledBlink(3);
     ledDoorAlert = false;
@@ -184,15 +209,18 @@ void loop() {
     digitalWrite(ledPin, LOW);
   }
 
-  // LED temp alert
+
+  // LED temp alert — blink 2x
   if (ledTempAlert) {
     ledBlink(2);
     ledTempAlert = false;
   }
 
+
   updateOLED();
   delay(300);
 }
+
 
 // ============================================================
 // TASK: Baca DHT22
@@ -204,9 +232,11 @@ void tempTask(void *pvParameters) {
   }
 }
 
+
 void triggerGetTemp() {
   if (tempTaskHandle != NULL) { xTaskResumeFromISR(tempTaskHandle); }
 }
+
 
 // ============================================================
 // BACA DHT22 + HANTAR KE SUPABASE
@@ -218,13 +248,16 @@ bool getTemperature() {
     return false;
   }
 
+
   temperature = data.temperature;
   humidity    = data.humidity;
+
 
   Serial.println("Temp: "     + String(temperature) + " C");
   Serial.println("Humidity: " + String(humidity)    + " %");
   Serial.println("Door: "     + String(doorOpen ? "OPEN" : "CLOSED"));
   Serial.println("------------------------");
+
 
   if (temperature > tempThreshold && !tempAlerted) {
     Serial.println("WARNING: SUHU TINGGI!");
@@ -234,16 +267,16 @@ bool getTemperature() {
     tempAlerted = false;
   }
 
-  if (WiFi.status() == WL_CONNECTED) { sendToSupabase(); }   // FIX — no parameters
+
+  if (WiFi.status() == WL_CONNECTED) { sendToSupabase(); }
   return true;
 }
 
+
 // ============================================================
-// HANTAR DATA KE SUPABASE — FIXED
+// HANTAR DATA KE SUPABASE
 // ============================================================
 void sendToSupabase() {
-  if (WiFi.status() != WL_CONNECTED) return;
-
   HTTPClient http;
   http.begin(supabaseUrl);
   http.addHeader("Content-Type", "application/json");
@@ -251,25 +284,26 @@ void sendToSupabase() {
   http.addHeader("Authorization", String("Bearer ") + supabaseKey);
   http.addHeader("Prefer", "return=minimal");
 
+
+  String doorStatus = doorOpen ? "OPEN" : "CLOSED";
   String payload = "{";
-  payload += "\"temperature\":"  + String(temperature, 1) + ",";
-  payload += "\"humidity\":"     + String(humidity, 1)    + ",";
-  payload += "\"door_open\":"    + String(doorOpen ? "true" : "false");
+  payload += "\"temperature\":"   + String(temperature, 2) + ",";
+  payload += "\"humidity\":"      + String(humidity, 2)    + ",";
+  payload += "\"door_status\":\"" + doorStatus             + "\",";
+  payload += "\"total_weight_grams\":0";
   payload += "}";
 
-  Serial.println("Sending: " + payload);
 
   int httpCode = http.POST(payload);
-
   if (httpCode == 201) {
-    Serial.println("Supabase OK ✓");
+    Serial.println("Supabase: Data sent OK!");
   } else {
-    Serial.println("Supabase ERROR: " + String(httpCode));
+    Serial.println("Supabase Error: " + String(httpCode));
     Serial.println(http.getString());
   }
-
   http.end();
 }
+
 
 // ============================================================
 // UPDATE OLED
@@ -278,10 +312,12 @@ void updateOLED() {
   display.clearDisplay();
   display.setTextColor(WHITE);
 
+
   display.setTextSize(1);
   display.setCursor(10, 0);
   display.println("SMART FRIDGE");
   display.drawLine(0, 10, 128, 10, WHITE);
+
 
   display.setCursor(0, 14);
   display.print("Temp:");
@@ -290,6 +326,7 @@ void updateOLED() {
   display.print(temperature, 1);
   display.print("C");
 
+
   display.setTextSize(1);
   display.setCursor(80, 14);
   display.print("Hum:");
@@ -297,24 +334,29 @@ void updateOLED() {
   display.print(humidity, 1);
   display.print("%");
 
+
   display.drawLine(0, 43, 128, 43, WHITE);
   display.setTextSize(1);
   display.setCursor(0, 46);
   display.print("Door: ");
   display.print(doorOpen ? "OPEN" : "CLOSED");
 
+
   if (temperature > tempThreshold) {
     display.setCursor(70, 46);
     display.print("!TEMP!");
   }
+
 
   if (doorOpen && doorAlerted) {
     display.setCursor(0, 56);
     display.print("DOOR OPEN TOO LONG!");
   }
 
+
   display.display();
 }
+
 
 // ============================================================
 // LED BLINK
@@ -328,6 +370,7 @@ void ledBlink(int times) {
   }
 }
 
+
 // ============================================================
 // WIFI STATUS OLED
 // ============================================================
@@ -340,6 +383,7 @@ void showWifiConnecting() {
   display.display();
 }
 
+
 void showWifiConnected() {
   display.clearDisplay();
   display.setTextSize(1);
@@ -350,3 +394,5 @@ void showWifiConnected() {
   display.println(WiFi.localIP().toString());
   display.display();
 }
+
+
